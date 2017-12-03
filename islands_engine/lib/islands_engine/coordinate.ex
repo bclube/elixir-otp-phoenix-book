@@ -31,8 +31,9 @@ defmodule IslandsEngine.Coordinate do
       {:error, :invalid_coordinate}
 
   """
-  def new(row, col) when row in(@board_range) and col in(@board_range), do:
-    {:ok, %Coordinate{row: row, col: col}}
+  def new(row, col) when row not in(@board_range) or col not in(@board_range), do:
+    {:error, :invalid_coordinate}
 
-  def new(_row, _col), do: {:error, :invalid_coordinate}
+  def new(row, col), do: 
+    {:ok, %Coordinate{row: row, col: col}}
 end
