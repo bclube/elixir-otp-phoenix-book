@@ -27,6 +27,26 @@ defmodule IslandsEngine.Island do
     end
   end
 
+  @doc """
+  Returns true if any of the `new_island`'s coordinates match any of `existing_island`'s
+  coordinates.
+
+  ## Examples
+
+      iex> with {:ok, i1} = IslandsEngine.Island.new(:dot, %IslandsEngine.Coordinate{row: 1, col: 1}),
+      ...>    {:ok, i2} = IslandsEngine.Island.new(:dot, %IslandsEngine.Coordinate{row: 1, col: 2}),
+      ...>    do: IslandsEngine.Island.overlaps?(i1, i2)
+      false
+
+      iex> with {:ok, i1} = IslandsEngine.Island.new(:dot, %IslandsEngine.Coordinate{row: 1, col: 1}),
+      ...>    {:ok, i2} = IslandsEngine.Island.new(:dot, %IslandsEngine.Coordinate{row: 1, col: 1}),
+      ...>    do: IslandsEngine.Island.overlaps?(i1, i2)
+      true
+
+  """
+  def overlaps?(%Island{} = existing_island, %Island{} = new_island), do:
+    not MapSet.disjoint?(existing_island.coordinates, new_island.coordinates)
+
   @shapes  %{
     square: [{0,0}, {0,1}, {1,0}, {1,1}],
     atoll: [{0,0}, {0,1}, {1,1}, {2,0}, {2,1}],
