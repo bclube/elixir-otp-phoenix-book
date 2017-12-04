@@ -61,6 +61,12 @@ defmodule IslandsEngine.Island do
     end
   end
 
+  @doc """
+  Returns true when `island` is completely forested; false otherwise.
+  """
+  def forested?(%Island{} = island), do:
+    MapSet.equal?(island.coordinates, island.hit_coordinates)
+
   @shapes  %{
     square: [{0,0}, {0,1}, {1,0}, {1,1}],
     atoll: [{0,0}, {0,1}, {1,1}, {2,0}, {2,1}],
