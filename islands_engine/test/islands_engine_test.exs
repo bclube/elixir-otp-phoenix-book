@@ -3,4 +3,5 @@ defmodule IslandsEngineTest do
   doctest IslandsEngine
   doctest IslandsEngine.Coordinate
   doctest IslandsEngine.Guesses
+  doctest IslandsEngine.Island
 end
