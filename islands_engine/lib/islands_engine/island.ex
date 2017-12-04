@@ -10,6 +10,14 @@ defmodule IslandsEngine.Island do
     :hit_coordinates
   ]
 
+  @shapes  %{
+    square: [{0,0}, {0,1}, {1,0}, {1,1}],
+    atoll: [{0,0}, {0,1}, {1,1}, {2,0}, {2,1}],
+    dot: [{0,0}],
+    l_shape: [{0,0}, {1,0}, {2,0}, {2,1}],
+    s_shape: [{0,1}, {0,2}, {1,0}, {1,1}]
+  }
+
   @doc """
   Creates a new Island with the given shape and upper left coordinate.
 
@@ -62,18 +70,16 @@ defmodule IslandsEngine.Island do
   end
 
   @doc """
+  Returns a list of valid island types.
+  """
+  def types, do:
+    Map.keys(@shapes) |> Enum.sort()
+
+  @doc """
   Returns true when `island` is completely forested; false otherwise.
   """
   def forested?(%Island{} = island), do:
     MapSet.equal?(island.coordinates, island.hit_coordinates)
-
-  @shapes  %{
-    square: [{0,0}, {0,1}, {1,0}, {1,1}],
-    atoll: [{0,0}, {0,1}, {1,1}, {2,0}, {2,1}],
-    dot: [{0,0}],
-    l_shape: [{0,0}, {1,0}, {2,0}, {2,1}],
-    s_shape: [{0,1}, {0,2}, {1,0}, {1,1}]
-  }
 
   defp offsets(key), do:
     Map.get(@shapes, key, {:error, :invalid_island_type})
