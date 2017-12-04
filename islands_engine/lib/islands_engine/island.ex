@@ -47,6 +47,20 @@ defmodule IslandsEngine.Island do
   def overlaps?(%Island{} = existing_island, %Island{} = new_island), do:
     not MapSet.disjoint?(existing_island.coordinates, new_island.coordinates)
 
+  @doc """
+  Adds `coordinate` to `island`'s guesses.
+
+  Returns:
+    {:hit, new_island} when the guess hits the island. `new_island` is the updated island record.
+    :miss when the guess does not hit the island.
+  """
+  def guess(%Island{} = island, %Coordinate{} = coordinate) do
+    case MapSet.member?(island.coordinates, coordinate) do
+      true -> {:hit, update_in(island.hit_coordinates, &MapSet.put(&1, coordinate))}
+      false -> :miss
+    end
+  end
+
   @shapes  %{
     square: [{0,0}, {0,1}, {1,0}, {1,1}],
     atoll: [{0,0}, {0,1}, {1,1}, {2,0}, {2,1}],
