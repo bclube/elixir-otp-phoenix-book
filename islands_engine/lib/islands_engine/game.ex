@@ -13,6 +13,10 @@ defmodule IslandsEngine.Game do
 
   @players [:player1, :player2]
 
+  ## Utility
+
+  def via_tuple(name), do: {:via, Registry, {Registry.Game, name}}
+
   ## Client methods
 
   @doc """
@@ -20,7 +24,7 @@ defmodule IslandsEngine.Game do
   starting the game (i.e. the name of player 1).
   """
   def start_link(name) when is_binary(name), do:
-    GenServer.start_link(__MODULE__, name, [])
+    GenServer.start_link(__MODULE__, name, name: via_tuple(name))
 
   @doc """
   Adds a second player to the `game`. `game` is the game server. `name` becomes
