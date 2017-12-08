@@ -32,10 +32,26 @@ defmodule IslandsEngine.Game do
   @doc """
   Adds an island to `player`'s game board. `game` is the game server. `key` is
   the type of island to be placed. `row` and `col` designate the upper left
-  coordinate to use at which to place the island.
+  coordinate at which to place the island.
   """
   def position_island(game, player, key, row, col) when player in @players, do:
     GenServer.call(game, {:position_island, player, key, row, col})
+
+  @doc """
+  Signals to the game server that `player` has finished placing their islands.
+
+  Returns:
+    {:ok, finished_board} when successful
+    :error or {:error, message} when not successful
+  """
+  def set_islands(game, player) when player in @players, do:
+    GenServer.call(game, {:set_islands, player})
+
+  @doc """
+  Adds a `player`s guess to the game board.
+  """
+  def guess_coordinate(game, player, row, col) when player in @players, do:
+    GenServer.call(game, {:guess_coordinate, player, row, col})
 
   ## Callbacks
 
@@ -73,6 +89,38 @@ defmodule IslandsEngine.Game do
     end
   end
 
+  def handle_call({:set_islands, player}, _from, state_data) do
+    board = player_board(state_data, player)
+    with {:ok, rules} <- Rules.check(state_data.rules, {:set_islands, player}),
+         true <- Board.all_islands_positioned?(board)
+    do
+      state_data
+      |> update_rules(rules)
+      |> reply({:ok, board})
+    else
+      :error -> {:reply, :error, state_data}
+      false -> {:reply, {:error, :not_all_islands_positioned}, state_data}
+    end
+  end
+
+  def handle_call({:guess_coordinate, player_key, row, col}, _from, state_data) do
+    opponent_key = opponent(player_key)
+    opponent_board = player_board(state_data, opponent_key)
+    with {:ok, rules} <- Rules.check(state_data.rules, {:guess_coordinate, player_key}),
+         {:ok, coordinate} <- Coordinate.new(row, col),
+         {hit_or_miss, forested_island, win_status, opponent_board} <- Board.guess(opponent_board, coordinate),
+         {:ok, rules} <- Rules.check(rules, {:win_check, win_status})
+    do
+      state_data
+      |> update_board(opponent_key, opponent_board)
+      |> update_guesses(player_key, hit_or_miss, coordinate)
+      |> update_rules(rules)
+      |> reply({hit_or_miss, forested_island, win_status})
+    else
+      error -> {:reply, error, state_data}
+    end
+  end
+
   defp update_player2_name(state_data, name), do:
     put_in(state_data.player2.name, name)
 
@@ -84,4 +132,10 @@ defmodule IslandsEngine.Game do
 
   defp update_board(state_data, player, board), do:
     Map.update!(state_data, player, fn player -> %{player | board: board} end)
+
+  defp update_guesses(state_data, player_key, hit_or_miss, coordinate), do:
+    update_in(state_data[player_key].guesses, &Guesses.add(&1, hit_or_miss, coordinate))
+
+  defp opponent(:player1), do: :player2
+  defp opponent(:player2), do: :player1
 end
