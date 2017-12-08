@@ -9,7 +9,9 @@ defmodule IslandsEngine.Game do
     Island,
     Rules
   }
-  use GenServer
+  use GenServer,
+    start: {__MODULE__, :start_link, []},
+    restart: :transient
 
   @players [:player1, :player2]
 
