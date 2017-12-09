@@ -74,6 +74,7 @@ defmodule IslandsEngine.Game do
       state_data
       |> update_player2_name(name)
       |> update_rules(rules)
+      |> commit_state()
       |> reply(:ok)
     else
       error -> reply(state_data, error)
@@ -90,6 +91,7 @@ defmodule IslandsEngine.Game do
       state_data
       |> update_board(player, board)
       |> update_rules(rules)
+      |> commit_state()
       |> reply(:ok)
     else
       error -> reply(state_data, error)
@@ -103,6 +105,7 @@ defmodule IslandsEngine.Game do
     do
       state_data
       |> update_rules(rules)
+      |> commit_state()
       |> reply({:ok, board})
     else
       :error -> reply(state_data, :error)
@@ -122,6 +125,7 @@ defmodule IslandsEngine.Game do
       |> update_board(opponent_key, opponent_board)
       |> update_guesses(player_key, hit_or_miss, coordinate)
       |> update_rules(rules)
+      |> commit_state()
       |> reply({hit_or_miss, forested_island, win_status})
     else
       error -> reply(state_data, error)
@@ -137,6 +141,11 @@ defmodule IslandsEngine.Game do
   defp update_rules(state_data, rules), do: %{state_data | rules: rules}
 
   defp reply(state_data, reply), do: {:reply, reply, state_data, @timeout}
+
+  defp commit_state(state_data) do
+    :ets.insert(:game_state, {state_data.player1.name, state_data})
+    state_data
+  end
 
   defp player_board(state_data, player), do: Map.get(state_data, player).board
 
