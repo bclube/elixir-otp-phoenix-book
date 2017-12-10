@@ -11,8 +11,10 @@ defmodule IslandsEngine.GameSupervisor do
     Supervisor.start_child(__MODULE__, [name])
 
   @doc "Stops the game with the given `name`."
-  def stop_game(name), do:
+  def stop_game(name) do
+    :ets.delete(:game_state, name)
     Supervisor.terminate_child(__MODULE__, pid_from_name(name))
+  end
 
   ## Callbacks
 
