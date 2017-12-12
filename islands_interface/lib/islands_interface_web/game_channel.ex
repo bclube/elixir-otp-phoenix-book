@@ -2,10 +2,16 @@ defmodule IslandsInterfaceWeb.GameChannel do
   use IslandsInterfaceWeb, :channel
 
   alias IslandsEngine.{Game, GameSupervisor}
+  alias IslandsInterfaceWeb.Presence
 
-  def join("game:" <> player, payload, socket) do
-    IO.inspect([player, payload, socket])
+  def join("game:" <> _player, %{"screen_name" => screen_name}, socket) do
+    send(self(), {:after_join, screen_name})
     {:ok, socket}
+  end
+
+  def handle_info({:after_join, screen_name}, socket) do
+    {:ok, _} = Presence.track(socket, screen_name, %{online_at: inspect(System.system_time(:seconds))})
+    {:noreply, socket}
   end
 
   def handle_in("new_game", _payload, socket) do
@@ -65,6 +71,11 @@ defmodule IslandsInterfaceWeb.GameChannel do
       :error ->
         {:reply, {:error, %{player: player}}, socket}
     end
+  end
+
+  def handle_in("show_subscribers", _payload, socket) do
+    broadcast!(socket, "subscribers", Presence.list(socket))
+    {:noreply, socket}
   end
 
   defp via("game:" <> player), do: Game.via_tuple(player)
