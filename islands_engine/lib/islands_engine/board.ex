@@ -4,6 +4,9 @@ defmodule IslandsEngine.Board do
   """
   alias IslandsEngine.{Coordinate, Island}
 
+  @valid_rows 1..10
+  @valid_columns 1..10
+
   @doc """
   Create a new board.
   """
@@ -13,13 +16,14 @@ defmodule IslandsEngine.Board do
   Position an island on the board.
 
   Returns:
-      new_board with island placed accordingly if island could legally be placed on the board
-      {:error, :overlapping_island} if the island would overlap an existing island.
+    new_board with island placed accordingly if island could legally be placed on the board
+    {:error, reason} if island could not legally be placed on the board
   """
-  def position_island(board, key, %Island{} = island) do
-    case overlaps_existing_island?(board, key, island) do
-      true -> {:error, :overlapping_island}
-      false -> Map.put(board, key, island)
+  def position_island(board, %Island{} = island) do
+    cond do
+      island_out_of_bounds?(island) -> {:error, :island_out_of_bounds}
+      overlaps_existing_island?(board, island) -> {:error, :overlapping_island}
+      :default -> Map.put(board, island.type, island)
     end
   end
 
@@ -32,53 +36,50 @@ defmodule IslandsEngine.Board do
   @doc """
 
   """
-  def guess(board, %Coordinate{} = coordinate) do
+  def guess(board, row, col) do
     board
-    |> check_all_islands(coordinate)
+    |> check_all_islands(row, col)
     |> guess_response(board)
   end
 
-  defp overlaps_existing_island?(board, new_key, %Island{} = new_island) do
-    Enum.any?(board, fn {key, island} ->
-      key != new_key and Island.overlaps?(island, new_island)
-    end)
-  end
+  defp coordinate_out_of_bounds?(%Coordinate{row: row, col: col}), do:
+    row not in @valid_rows or col not in @valid_columns
 
-  defp check_all_islands(board, coordinate) do
-    Enum.find_value(board, :miss, fn {key, island} ->
-      case Island.guess(island, coordinate) do
-        {:hit, island} -> {key, island}
-        :miss -> false
-      end
-    end)
-  end
+  defp island_out_of_bounds?(island), do:
+    Enum.any?(island.coordinates, &coordinate_out_of_bounds?/1)
 
-  defp guess_response({key, island}, board) do
-    board = %{board| key => island}
-    {:hit, forest_check(board, key), win_check(board), board}
-  end
-  defp guess_response(:miss, board), do: {:miss, :none, :no_win, board}
-
-  defp forest_check(board, key) do
-    case forested?(board, key) do
-      true -> key
-      false -> :none
-    end
-  end
-
-  defp forested?(board, key) do
+  defp overlaps_existing_island?(board, %Island{type: type} = new_island) do
     board
-    |> Map.fetch!(key)
-    |> Island.forested?()
+    |> Map.delete(type)
+    |> Map.values()
+    |> Enum.any?(&Island.overlaps?(&1, new_island))
   end
 
-  defp win_check(board) do
-    case all_forested?(board) do
-      true -> :win
-      false -> :no_win
+  defp check_all_islands(board, row, col) do
+    board
+    |> Map.values()
+    |> Enum.find_value(:miss, &check_island(&1, row, col))
+  end
+
+  defp check_island(island, row, col) do
+    case Island.guess(island, row, col) do
+      {:hit, island} -> island
+      :miss -> false
     end
   end
+
+  defp guess_response(:miss, board), do: {:miss, :none, :no_win, board}
+  defp guess_response(island, board) do
+    board = %{board| island.type => island}
+    {:hit, forest_check(island), win_check(board), board}
+  end
+
+  defp forest_check(island), do:
+    if Island.forested?(island), do: island.type, else: :none
+
+  defp win_check(board), do:
+    if all_forested?(board), do: :win, else: :no_win
 
   defp all_forested?(board), do:
-    Enum.all?(board, fn {_key, island} -> Island.forested?(island) end)
+    board |> Map.values() |> Enum.all?(&Island.forested?/1)
 end

@@ -106,9 +106,8 @@ defmodule IslandsEngine.Game do
   def handle_event({:call, from}, {:position_island, player, key, row, col}, _state, data) do
     board = player_board(data, player)
     with {:ok, rules} <- Rules.check(data.rules, {:position_islands, player}),
-      {:ok, coordinate} <- Coordinate.new(row, col),
-      {:ok, island} <- Island.new(key, coordinate),
-      %{} = board <- Board.position_island(board, key, island)
+      {:ok, island} <- Island.new(key, row, col),
+      %{} = board <- Board.position_island(board, island)
     do
       data
       |> update_board(player, board)
@@ -139,13 +138,12 @@ defmodule IslandsEngine.Game do
     opponent_key = opponent(player_key)
     opponent_board = player_board(data, opponent_key)
     with {:ok, rules} <- Rules.check(data.rules, {:guess_coordinate, player_key}),
-         {:ok, coordinate} <- Coordinate.new(row, col),
-         {hit_or_miss, forested_island, win_status, opponent_board} <- Board.guess(opponent_board, coordinate),
+         {hit_or_miss, forested_island, win_status, opponent_board} <- Board.guess(opponent_board, row, col),
          {:ok, rules} <- Rules.check(rules, {:win_check, win_status})
     do
       data
       |> update_board(opponent_key, opponent_board)
-      |> update_guesses(player_key, hit_or_miss, coordinate)
+      |> update_guesses(player_key, hit_or_miss, row, col)
       |> update_rules(rules)
       |> backup_data()
       |> reply_success(from, {hit_or_miss, forested_island, win_status})
@@ -183,8 +181,10 @@ defmodule IslandsEngine.Game do
   defp update_board(data, player, board), do:
     Map.update!(data, player, fn player -> %{player | board: board} end)
 
-  defp update_guesses(data, player_key, hit_or_miss, coordinate), do:
+  defp update_guesses(data, player_key, hit_or_miss, row, col) do
+    coordinate = Coordinate.new(row, col)
     update_in(data[player_key].guesses, &Guesses.add(&1, hit_or_miss, coordinate))
+  end
 
   defp fresh_state(name) do
     player1 = %{name: name, board: Board.new(), guesses: Guesses.new()}
