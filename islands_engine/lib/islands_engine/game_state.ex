@@ -4,7 +4,6 @@ defmodule IslandsEngine.GameState do
   alias IslandsEngine.{
     Board,
     Coordinate,
-    GameState,
     Guesses,
     Island,
     Rules,
@@ -38,7 +37,7 @@ defmodule IslandsEngine.GameState do
   def new(name) when is_binary(name) do
     player1 = %{name: name, board: Board.new(), guesses: Guesses.new()}
     player2 = %{name: nil, board: Board.new(), guesses: Guesses.new()}
-    %__MODULE__{player1: player1, player2: player2, rules: %Rules{}}
+    %__MODULE__{player1: player1, player2: player2, rules: Rules.new()}
   end
 
   def add_player(%__MODULE__{}=game, name) when is_binary(name) do
@@ -55,7 +54,7 @@ defmodule IslandsEngine.GameState do
 
   def position_island(%__MODULE__{}=game, player, key, row, col) do
     board = player_board(game, player)
-    with {:ok, rules} <- Rules.check(game.rules, {:position_islands, player}),
+    with {:ok, rules} <- Rules.check(game.rules, {:position_island, player}),
       {:ok, island} <- Island.new(key, row, col),
       %{} = board <- Board.position_island(board, island)
     do
