@@ -2,13 +2,7 @@ defmodule IslandsEngine.Game do
   @moduledoc """
   Tracks the current state of a single game between two players.
   """
-  alias IslandsEngine.{
-    Board,
-    Coordinate,
-    Guesses,
-    Island,
-    Rules
-  }
+  alias IslandsEngine.GameState
   @behaviour :gen_statem
 
   @timeout :timer.hours(24)
@@ -81,74 +75,40 @@ defmodule IslandsEngine.Game do
 
   def handle_event(:info, {:initialize, name}, :uninitialized, _data) do
     data = case :ets.lookup(:game_state, name) do
-      [] -> fresh_state(name)
+      [] -> GameState.new(name)
       [{_key, state}] -> state
     end
-    backup_data(data)
+    backup_data!(data)
     {:next_state, :running, data, @timeout}
   end
   def handle_event(_event_type, _event_content, :uninitialized, _data), do:
     {:keep_state_and_data, :postpone}
 
   def handle_event({:call, from}, {:add_player, name}, _state, data) do
-    with {:ok, rules} <- Rules.check(data.rules, :add_player)
-    do
-      data
-      |> update_player2_name(name)
-      |> update_rules(rules)
-      |> backup_data()
-      |> reply_success(from, :ok)
-    else
-      error -> reply_error(from, error)
+    case GameState.add_player(data, name) do
+      {:ok, new_data} -> reply_success!(new_data, from, :ok)
+      {:error, _}=err -> reply_error(from, err)
     end
   end
 
   def handle_event({:call, from}, {:position_island, player, key, row, col}, _state, data) do
-    board = player_board(data, player)
-    with {:ok, rules} <- Rules.check(data.rules, {:position_islands, player}),
-      {:ok, island} <- Island.new(key, row, col),
-      %{} = board <- Board.position_island(board, island)
-    do
-      data
-      |> update_board(player, board)
-      |> update_rules(rules)
-      |> backup_data()
-      |> reply_success(from, :ok)
-    else
-      error -> reply_error(from, error)
+    case GameState.position_island(data, player, key, row, col) do
+      {:ok, new_data} -> reply_success!(new_data, from, :ok)
+      {:error, _}=err -> reply_error(from, err)
     end
   end
 
   def handle_event({:call, from}, {:set_islands, player}, _state, data) do
-    board = player_board(data, player)
-    with {:ok, rules} <- Rules.check(data.rules, {:set_islands, player}),
-         true <- Board.all_islands_positioned?(board)
-    do
-      data
-      |> update_rules(rules)
-      |> backup_data()
-      |> reply_success(from, {:ok, board})
-    else
-      :error -> reply_error(from, :error)
-      false -> reply_error(from, {:error, :not_all_islands_positioned})
+    case GameState.set_islands(data, player) do
+      {:ok, board, new_data} -> reply_success!(new_data, from, {:ok, board})
+      {:error, _}=err -> reply_error(from, err)
     end
   end
 
   def handle_event({:call, from}, {:guess_coordinate, player_key, row, col}, _state, data) do
-    opponent_key = opponent(player_key)
-    opponent_board = player_board(data, opponent_key)
-    with {:ok, rules} <- Rules.check(data.rules, {:guess_coordinate, player_key}),
-         {hit_or_miss, forested_island, win_status, opponent_board} <- Board.guess(opponent_board, row, col),
-         {:ok, rules} <- Rules.check(rules, {:win_check, win_status})
-    do
-      data
-      |> update_board(opponent_key, opponent_board)
-      |> update_guesses(player_key, hit_or_miss, row, col)
-      |> update_rules(rules)
-      |> backup_data()
-      |> reply_success(from, {hit_or_miss, forested_island, win_status})
-    else
-      error -> reply_error(from, error)
+    case GameState.guess_coordinate(data, player_key, row, col) do
+      {:ok, result, new_data} -> reply_success!(new_data, from, result)
+      {:error, _}=err -> reply_error(from, err)
     end
   end
 
@@ -161,37 +121,13 @@ defmodule IslandsEngine.Game do
   end
   def terminate(_reason, _state, _data), do: :ok
 
-  defp update_player2_name(data, name), do:
-    put_in(data.player2.name, name)
-
-  defp update_rules(data, rules), do: %{data | rules: rules}
-
-  defp reply_success(data, from, reply), do:
+  defp reply_success!(data, from, reply) do
+    backup_data!(data)
     {:keep_state, data, [{:reply, from, reply}, @timeout]}
+  end
   defp reply_error(from, reply), do:
     {:keep_state_and_data, [{:reply, from, reply}, @timeout]}
 
-  defp backup_data(data) do
+  defp backup_data!(data), do:
     :ets.insert(:game_state, {data.player1.name, data})
-    data
-  end
-
-  defp player_board(data, player), do: Map.get(data, player).board
-
-  defp update_board(data, player, board), do:
-    Map.update!(data, player, fn player -> %{player | board: board} end)
-
-  defp update_guesses(data, player_key, hit_or_miss, row, col) do
-    coordinate = Coordinate.new(row, col)
-    update_in(data[player_key].guesses, &Guesses.add(&1, hit_or_miss, coordinate))
-  end
-
-  defp fresh_state(name) do
-    player1 = %{name: name, board: Board.new(), guesses: Guesses.new()}
-    player2 = %{name: nil, board: Board.new(), guesses: Guesses.new()}
-    %{player1: player1, player2: player2, rules: %Rules{}}
-  end
-
-  defp opponent(:player1), do: :player2
-  defp opponent(:player2), do: :player1
 end
